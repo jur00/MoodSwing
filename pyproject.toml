@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "moodswing"
+version = "0.1.0"
+description = ""
+authors = ["jur00 <jurriaanoudenaarden@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pandas = "^2.2.3"
+pydub = "^0.25.1"
+plotly = "^5.24.1"
+llvmlite = "0.43.0"
+librosa = "0.10.2post1"
+google-auth = "^2.35.0"
+google-auth-oauthlib = "^1.2.1"
+google-auth-httplib2 = "^0.2.0"
+google-api-python-client = "^2.149.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
