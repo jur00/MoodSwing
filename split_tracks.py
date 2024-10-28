@@ -180,6 +180,8 @@ def remove_temporary_files(folder_name: str):
 
 if __name__ == "__main__":
 
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
     # get batch number, so it defines the tracks it will split
     parser = argparse.ArgumentParser(description="Script to process and split files in batches.")
 
