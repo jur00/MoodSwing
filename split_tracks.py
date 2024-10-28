@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Dict
 import io
 import argparse
+import logging
 
 import numpy as np
 from pydub import AudioSegment
@@ -208,12 +209,16 @@ if __name__ == "__main__":
 
     track_batch = track_batches[batch-1]
 
+    n_tracks_to_do = len(tracks_to_do)
+
+    logging.info(f'Still {n_tracks_to_do} tracks to split')
+
     # split my tracks
     progress = Progress()
     for track in track_batch[:100]:
 
         # first create new empty splitted track folder
-        create_drive_folder(stem(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
+        splitted_folder_id = create_drive_folder(stem(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
 
         # download track
         download_file(track["id"], track["name"], drive_service)
@@ -222,7 +227,7 @@ if __name__ == "__main__":
         split_audio_file(track["name"], Path("track_temp"), Path("splitted_temp"))
 
         # upload all resulting track segments
-        upload_segments(Path("splitted_temp"), folder_id_map["3sec_split_tracks"], drive_service)
+        upload_segments(Path("splitted_temp"), splitted_folder_id, drive_service)
 
         # clean-up temporary local temporary files
         remove_temporary_files("track_temp")
