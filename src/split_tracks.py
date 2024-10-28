@@ -1,6 +1,5 @@
 from pathlib import Path
-import json
-from typing import List
+from typing import List, Dict
 import io
 
 from pydub import AudioSegment
@@ -11,11 +10,16 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+from src.utils import stem, Progress
+
+
 client_secrets_path = Path("client_secret_595444979670-ui22j3vs7v2uav527s3vhdhalg8t6e2k.apps.googleusercontent.com.json")
 scopes = ['https://www.googleapis.com/auth/drive']
 folder_id_map = {
     "tracks_my": "1KqDNssfz3Js1hMT92tBg9R78iah8z1oo",
+    "3sec_split_tracks": "1I-DPdGfHS_6zLX63RhhNBpo9ohEUhj2O"
 }
+
 
 def authenticate_with_oauth(client_secrets_path: Path, scopes: List):
     creds = None
@@ -40,16 +44,77 @@ def authenticate_with_oauth(client_secrets_path: Path, scopes: List):
 
     return creds
 
-def list_files_in_folder(service, folder_id):
-    query = f"'{folder_id}' in parents"  # Query to get files in the specified folder
-    results = service.files().list(q=query, fields="files(id, name)").execute()
-    items = results.get('files', [])
+
+def list_files_in_folder(folder_id, service):
+    items = []
+    query = f"'{folder_id}' in parents"
+    page_token = None
+
+    while True:
+        results = service.files().list(
+            q=query,
+            fields="nextPageToken, files(id, name)",
+            pageToken=page_token
+        ).execute()
+
+        # Append the current page of files to the list
+        items.extend(results.get('files', []))
+
+        # Get the next page token
+        page_token = results.get('nextPageToken')
+
+        # If there’s no next page, break out of the loop
+        if not page_token:
+            break
 
     return items
 
-# Function to download a file from Google Drive
-def download_file(file_id, file_name):
-    request = drive_service.files().get_media(fileId=file_id)
+
+def list_folders_in_folder(folder_id, service):
+    items = []
+    query = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder'"
+    page_token = None
+
+    while True:
+        results = service.files().list(
+            q=query,
+            fields="nextPageToken, files(name)",
+            pageToken=page_token
+        ).execute()
+
+        # Append the current page of files to the list
+        items.extend(results.get('files', []))
+
+        # Get the next page token
+        page_token = results.get('nextPageToken')
+
+        # If there’s no next page, break out of the loop
+        if not page_token:
+            break
+
+    item_names = [item['name'] for item in items]
+
+    return item_names
+
+
+def filter_tracks_done_from_tracks_to_do(tracks_to_do: List[Dict[str, str]], tracks_done: List[str]):
+    return [item for item in tracks_to_do if stem(item['name']) not in tracks_done]
+
+
+def create_drive_folder(folder_name: str, parent_folder_id: str, service):
+    # Define metadata for the new folder
+    folder_metadata = {
+        'name': folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_folder_id] if parent_folder_id else []
+    }
+    folder = service.files().create(body=folder_metadata, fields='id').execute()
+    print(f"Created Google Drive folder '{folder_name}' with ID: {folder.get('id')}")
+    return folder.get('id')
+
+
+def download_file(file_id, file_name, service):
+    request = service.files().get_media(fileId=file_id)
     fh = io.BytesIO()  # Create a bytes buffer to store the downloaded content
 
     # Create a downloader object
@@ -59,29 +124,75 @@ def download_file(file_id, file_name):
     # Download the file in chunks
     while done is False:
         status, done = downloader.next_chunk()
-        print(f"Download {int(status.progress() * 100)}%.")
+        # print(f"Download {int(status.progress() * 100)}%.")
 
     # Write the downloaded content to a file
     with open(Path(f"track_temp/{file_name}"), 'wb') as f:
         f.write(fh.getvalue())
 
 
-def clear_temporary_downloads():
+def split_audio_file(file_name: str, source_path: Path, destination_path: Path, segment_length: float=3000):
+    file_path = source_path.joinpath(file_name)
+    audio = AudioSegment.from_file(file_path)
+
+    for i in range(0, len(audio) - 1, segment_length):
+        segment = audio[i:i + segment_length]
+        segment_number = str(i // segment_length).zfill(3)
+        segment_file_name = destination_path.joinpath(f'segment_{segment_number}.mp3')
+        segment.export(segment_file_name, format='mp3')
+
+
+def upload_segments(local_folder_path: Path, splitted_folder_id: str, service):
+    # Iterate over files in the folder
+    for file_path in local_folder_path.rglob('*'):
+        # Skip directories and .gitkeep file
+        if file_path.is_dir() or file_path.name == '.gitkeep':
+            continue
+
+        # Define file metadata and upload
+        file_metadata = {
+            'name': file_path.name,
+            'parents': [splitted_folder_id]
+        }
+        media = MediaFileUpload(str(file_path), resumable=True)
+        service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        # print(f"Uploaded '{file_path.name}' to Google Drive folder ID '{splitted_folder_id}'")
+
+
+def remove_temporary_files(folder_name: str):
     # Convert the folder path to a Path object
-    folder = Path('track_temp')
+    folder = Path(folder_name)
     # Iterate over all files and directories in the folder
     for item in folder.iterdir():
+        item_name = str(item).split('\\')[-1]
+        if item_name == '.gitkeep':
+            continue
         item.unlink()
 
-credentials = authenticate_with_oauth(client_secrets_path, scopes)
+if __name__ == "__main__":
 
-# Initialize Google Drive API
-drive_service = build('drive', 'v3', credentials=credentials)
+    credentials = authenticate_with_oauth(client_secrets_path, scopes)
 
-tracks = list_files_in_folder(drive_service, folder_id_map["tracks_my"])
+    drive_service = build('drive', 'v3', credentials=credentials)
 
-file_id, file_name = tracks[0].values()
+    tracks_to_do = list_files_in_folder(folder_id_map["tracks_my"], drive_service)
 
-download_file(file_id, file_name)
+    tracks_done = list_folders_in_folder(folder_id_map["3sec_split_tracks"], drive_service)
 
-clear_temporary_downloads()
+    tracks_to_do = filter_tracks_done_from_tracks_to_do(tracks_to_do, tracks_done)
+
+    progress = Progress()
+    for track in tracks_to_do:
+        create_drive_folder(stem(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
+
+        download_file(track["id"], track["name"], drive_service)
+
+        split_audio_file(track["name"], Path("track_temp"), Path("splitted_temp"))
+
+        upload_segments(Path("splitted_temp"), folder_id_map["3sec_split_tracks"], drive_service)
+
+        remove_temporary_files("track_temp")
+
+        remove_temporary_files("splitted_temp")
+
+        progress.show(track, tracks_to_do)
