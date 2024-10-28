@@ -15,7 +15,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from src.utils import stem, Progress
 
 
-client_secrets_path = Path("client_secret_595444979670-ui22j3vs7v2uav527s3vhdhalg8t6e2k.apps.googleusercontent.com.json")
+client_secrets_path = Path("client_secrets.json")
 scopes = ['https://www.googleapis.com/auth/drive']
 folder_id_map = {
     "tracks_my": "1KqDNssfz3Js1hMT92tBg9R78iah8z1oo",
@@ -206,7 +206,7 @@ if __name__ == "__main__":
     # get only the nth batch
     track_batches = create_track_batches(tracks_to_do)
 
-    track_batch = track_batches[batch]
+    track_batch = track_batches[batch-1]
 
     # split my tracks
     progress = Progress()
