@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import List, Dict
 import io
+import argparse
 
+import numpy as np
 from pydub import AudioSegment
 
 from googleapiclient.discovery import build
@@ -101,6 +103,11 @@ def filter_tracks_done_from_tracks_to_do(tracks_to_do: List[Dict[str, str]], tra
     return [item for item in tracks_to_do if stem(item['name']) not in tracks_done]
 
 
+def create_track_batches(tracks_to_do: List[Dict[str, str]]):
+    track_batches = np.array_split(tracks_to_do, 5)
+    return track_batches
+
+
 def create_drive_folder(folder_name: str, parent_folder_id: str, service):
     # Define metadata for the new folder
     folder_metadata = {
@@ -169,30 +176,58 @@ def remove_temporary_files(folder_name: str):
             continue
         item.unlink()
 
+
 if __name__ == "__main__":
 
+    # get batch number, so it defines the tracks it will split
+    parser = argparse.ArgumentParser(description="Script to process and split files in batches.")
+
+    parser.add_argument("--batch", type=str, required=True, help="The batch name to process (e.g., --batch batch1).")
+
+    args = parser.parse_args()
+
+    batch = int(args.batch.split('_')[-1])
+
+    # authentication
     credentials = authenticate_with_oauth(client_secrets_path, scopes)
 
+    # set up drive service
     drive_service = build('drive', 'v3', credentials=credentials)
 
+    # get list of all tracks
     tracks_to_do = list_files_in_folder(folder_id_map["tracks_my"], drive_service)
 
+    # check which tracks are already splitted
     tracks_done = list_folders_in_folder(folder_id_map["3sec_split_tracks"], drive_service)
 
+    # filter my tracks, so only the unsplitted tracks are left
     tracks_to_do = filter_tracks_done_from_tracks_to_do(tracks_to_do, tracks_done)
 
+    # get only the nth batch
+    track_batches = create_track_batches(tracks_to_do)
+
+    track_batch = track_batches[batch]
+
+    # split my tracks
     progress = Progress()
-    for track in tracks_to_do:
+    for track in track_batch[:100]:
+
+        # first create new empty splitted track folder
         create_drive_folder(stem(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
 
+        # download track
         download_file(track["id"], track["name"], drive_service)
 
+        # split
         split_audio_file(track["name"], Path("track_temp"), Path("splitted_temp"))
 
+        # upload all resulting track segments
         upload_segments(Path("splitted_temp"), folder_id_map["3sec_split_tracks"], drive_service)
 
+        # clean-up temporary local temporary files
         remove_temporary_files("track_temp")
 
         remove_temporary_files("splitted_temp")
 
+        # show progress
         progress.show(track, tracks_to_do)
