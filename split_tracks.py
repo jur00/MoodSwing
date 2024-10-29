@@ -3,6 +3,7 @@ from typing import List, Dict
 import io
 import argparse
 import logging
+import time
 
 import numpy as np
 from pydub import AudioSegment
@@ -12,6 +13,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.errors import HttpError
 
 from src.utils import stem, Progress
 
@@ -125,18 +127,32 @@ def download_file(file_id, file_name, service):
     request = service.files().get_media(fileId=file_id)
     fh = io.BytesIO()  # Create a bytes buffer to store the downloaded content
 
-    # Create a downloader object
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
+    retry_count = 0
+    while retry_count < 5:
+        try:
+            # Create a downloader object
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
 
-    # Download the file in chunks
-    while done is False:
-        status, done = downloader.next_chunk()
-        # print(f"Download {int(status.progress() * 100)}%.")
+            # Download the file in chunks
+            while done is False:
+                status, done = downloader.next_chunk()
+                # print(f"Download {int(status.progress() * 100)}%.")
 
-    # Write the downloaded content to a file
-    with open(Path(f"track_temp/{file_name}"), 'wb') as f:
-        f.write(fh.getvalue())
+            # Write the downloaded content to a file
+            with open(Path(f"track_temp/{file_name}"), 'wb') as f:
+                f.write(fh.getvalue())
+            break
+
+        except HttpError as e:
+            if e.resp.status in [403, 429, 500, 503]:
+                if e.resp.status in [403, 429, 500, 503]:  # Common rate limit or server errors
+                    retry_count += 1
+                    wait_time = 2 ** retry_count  # Exponential backoff
+                    logging.warning(f"Rate limit hit, retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    raise  # Raise error for non-rate-limit errors
 
 
 def split_audio_file(file_name: str, source_path: Path, destination_path: Path, segment_length: float=3000):
@@ -162,9 +178,22 @@ def upload_segments(local_folder_path: Path, splitted_folder_id: str, service):
             'name': file_path.name,
             'parents': [splitted_folder_id]
         }
-        media = MediaFileUpload(str(file_path), resumable=True)
-        service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        # print(f"Uploaded '{file_path.name}' to Google Drive folder ID '{splitted_folder_id}'")
+
+        retry_count = 0
+        while retry_count < 5:  # Limit retries to avoid infinite loop
+            try:
+                media = MediaFileUpload(str(file_path), resumable=True)
+                service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+                break
+
+            except HttpError as e:
+                if e.resp.status in [403, 429, 500, 503]:  # Common rate limit or server errors
+                    retry_count += 1
+                    wait_time = 2 ** retry_count  # Exponential backoff
+                    logging.log(f"Rate limit hit, retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    raise  # Raise error for non-rate-limit errors
 
 
 def remove_temporary_files(folder_name: str):
@@ -236,5 +265,5 @@ if __name__ == "__main__":
 
         remove_temporary_files("splitted_temp")
 
-        # show progress
-        progress.show(track, tracks_to_do)
+        # log progress
+        progress.log(track, tracks_to_do)
