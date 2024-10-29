@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        batch: [batch_1, batch_2, batch_3, batch_4, batch_5]  # 5 processes for each scheduled time
+        batch: [batch_1, batch_2, batch_3, batch_4]  # 5 processes for each scheduled time
 
     steps:
       - name: Checkout code
