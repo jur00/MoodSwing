@@ -190,7 +190,7 @@ def upload_segments(local_folder_path: Path, splitted_folder_id: str, service):
                 if e.resp.status in [403, 429, 500, 503]:  # Common rate limit or server errors
                     retry_count += 1
                     wait_time = 2 ** retry_count  # Exponential backoff
-                    logging.log(f"Rate limit hit, retrying in {wait_time} seconds...")
+                    logging.warning(f"Rate limit hit, retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
                 else:
                     raise  # Raise error for non-rate-limit errors
