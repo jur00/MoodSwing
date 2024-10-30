@@ -136,6 +136,6 @@ class Progress:
     def log(self, iteration, iterator):
         self._get_properties(iteration, iterator)
         logging.info(f'Time per iteration (MM:SS) - '
-                     f'current: {self.iter_times_readable[-1]}'
+                     f'current: {self.iter_times_readable[-1]}, '
                      f'average: {self.iter_times_mean_readable}, '
-                     f'min: {self.iter_times_mean_readable}')
+                     f'min: {self.iter_times_min_readable}')
