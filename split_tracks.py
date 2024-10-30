@@ -107,7 +107,7 @@ def filter_tracks_done_from_tracks_to_do(tracks_to_do: List[Dict[str, str]], tra
 
 
 def create_track_batches(tracks_to_do: List[Dict[str, str]]):
-    track_batches = np.array_split(tracks_to_do, 5)
+    track_batches = np.array_split(tracks_to_do, 2)
     return track_batches
 
 
