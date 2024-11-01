@@ -22,7 +22,7 @@ client_secrets_path = Path("client_secrets.json")
 scopes = ['https://www.googleapis.com/auth/drive']
 folder_id_map = {
     "tracks_my": "1KqDNssfz3Js1hMT92tBg9R78iah8z1oo",
-    "3sec_split_tracks": "1I-DPdGfHS_6zLX63RhhNBpo9ohEUhj2O"
+    "3sec_split_tracks": "1WyztSbMFXyZ1USt8aGRIP6O7dMxtUMs4"
 }
 
 
