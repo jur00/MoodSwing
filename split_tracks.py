@@ -9,7 +9,7 @@ import numpy as np
 from pydub import AudioSegment
 
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, BatchHttpRequest
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -106,11 +106,6 @@ def filter_tracks_done_from_tracks_to_do(tracks_to_do: List[Dict[str, str]], tra
     return [item for item in tracks_to_do if stem(item['name']) not in tracks_done]
 
 
-def create_track_batches(tracks_to_do: List[Dict[str, str]]):
-    track_batches = np.array_split(tracks_to_do, 2)
-    return track_batches
-
-
 def create_drive_folder(folder_name: str, parent_folder_id: str, service):
     # Define metadata for the new folder
     folder_metadata = {
@@ -119,7 +114,7 @@ def create_drive_folder(folder_name: str, parent_folder_id: str, service):
         'parents': [parent_folder_id] if parent_folder_id else []
     }
     folder = service.files().create(body=folder_metadata, fields='id').execute()
-    print(f"Created Google Drive folder '{folder_name}' with ID: {folder.get('id')}")
+    # print(f"Created Google Drive folder '{folder_name}' with ID: {folder.get('id')}")
     return folder.get('id')
 
 
@@ -127,32 +122,18 @@ def download_file(file_id, file_name, service):
     request = service.files().get_media(fileId=file_id)
     fh = io.BytesIO()  # Create a bytes buffer to store the downloaded content
 
-    retry_count = 0
-    while retry_count < 5:
-        try:
-            # Create a downloader object
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
+    # Create a downloader object
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
 
-            # Download the file in chunks
-            while done is False:
-                status, done = downloader.next_chunk()
-                # print(f"Download {int(status.progress() * 100)}%.")
+    # Download the file in chunks
+    while done is False:
+        status, done = downloader.next_chunk()
+        # print(f"Download {int(status.progress() * 100)}%.")
 
-            # Write the downloaded content to a file
-            with open(Path(f"track_temp/{file_name}"), 'wb') as f:
-                f.write(fh.getvalue())
-            break
-
-        except HttpError as e:
-            if e.resp.status in [403, 429, 500, 503]:
-                if e.resp.status in [403, 429, 500, 503]:  # Common rate limit or server errors
-                    retry_count += 1
-                    wait_time = 2 ** retry_count  # Exponential backoff
-                    logging.warning(f"Rate limit hit, retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    raise  # Raise error for non-rate-limit errors
+    # Write the downloaded content to a file
+    with open(Path(f"track_temp/{file_name}"), 'wb') as f:
+        f.write(fh.getvalue())
 
 
 def split_audio_file(file_name: str, source_path: Path, destination_path: Path, segment_length: float=3000):
@@ -166,39 +147,9 @@ def split_audio_file(file_name: str, source_path: Path, destination_path: Path, 
         segment.export(segment_file_name, format='mp3')
 
 
-def _handle_upload_response(request_id, response, exception):
-    if exception:
-        logging.error(f"Failed to upload file with request ID {request_id}: {exception}")
-    else:
-        logging.info(f"Uploaded file ID {response.get('id')} successfully.")
-
-
-def _count_files_in_folder(folder_path: Path):
-    return sum(1 for file in folder_path.iterdir() if file.is_file())
-
-
-def _execute_with_retries(batch, max_retries=5):
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            batch.execute()
-            break  # Exit if successful
-        except HttpError as e:
-            if e.resp.status in [403, 429, 500, 503]:  # Rate limit or server error codes
-                retry_count += 1
-                wait_time = 2 ** retry_count  # Exponential backoff
-                logging.warning(f"Rate limit hit, retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-            else:
-                raise  # Raise error for other HTTP errors
-
-
 def upload_segments(local_folder_path: Path, splitted_folder_id: str, service):
-    batch = BatchHttpRequest(callback=_handle_upload_response)
-    batch_size = _count_files_in_folder(local_folder_path) - 1
-
     # Iterate over files in the folder
-    for file_count, file_path in enumerate(local_folder_path.rglob('*'), start=1):
+    for file_path in local_folder_path.rglob('*'):
         # Skip directories and .gitkeep file
         if file_path.is_dir() or file_path.name == '.gitkeep':
             continue
@@ -209,20 +160,10 @@ def upload_segments(local_folder_path: Path, splitted_folder_id: str, service):
             'parents': [splitted_folder_id]
         }
 
-        # Create a MediaFileUpload object for the file
         media = MediaFileUpload(str(file_path), resumable=True)
+        service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-        # Add the file upload request to the batch
-        batch.add(service.files().create(body=file_metadata, media_body=media, fields='id'))
-
-        # Execute batch when reaching batch_size limit or end of files
-        if file_count == batch_size:
-            _execute_with_retries(batch)
-            batch = BatchHttpRequest(callback=_handle_upload_response)  # Reset batch
-
-    # Execute any remaining requests in the last batch
-    if len(batch._order) > 0:
-        _execute_with_retries(batch)
+        time.sleep(1)
 
 
 def remove_temporary_files(folder_name: str):
@@ -240,15 +181,6 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # get batch number, so it defines the tracks it will split
-    parser = argparse.ArgumentParser(description="Script to process and split files in batches.")
-
-    parser.add_argument("--batch", type=str, required=True, help="The batch name to process (e.g., --batch batch1).")
-
-    args = parser.parse_args()
-
-    batch = int(args.batch.split('_')[-1])
-
     # authentication
     credentials = authenticate_with_oauth(client_secrets_path, scopes)
 
@@ -264,18 +196,13 @@ if __name__ == "__main__":
     # filter my tracks, so only the unsplitted tracks are left
     tracks_to_do = filter_tracks_done_from_tracks_to_do(tracks_to_do, tracks_done)
 
-    # get only the nth batch
-    track_batches = create_track_batches(tracks_to_do)
-
-    track_batch = track_batches[batch-1]
-
     n_tracks_to_do = len(tracks_to_do)
 
     logging.info(f'Still {n_tracks_to_do} tracks to split')
 
     # split my tracks
     progress = Progress()
-    for track in track_batch[:100]:
+    for track in tracks_to_do[:100]:
 
         # first create new empty splitted track folder
         splitted_folder_id = create_drive_folder(stem(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
