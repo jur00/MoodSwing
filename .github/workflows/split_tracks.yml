@@ -2,18 +2,15 @@ name: Split Tracks in Batches
 
 on:
   workflow_dispatch:  # Allow manual runs
-  # schedule:
-  #   - cron: '0 0 * * *'    # Run batch 1 daily at 00:00 UTC
-  #   - cron: '0 6 * * *'    # Run batch 2 daily at 06:00 UTC
-  #   - cron: '0 12 * * *'   # Run batch 3 daily at 12:00 UTC
-  #   - cron: '0 18 * * *'   # Run batch 4 daily at 18:00 UTC
+  schedule:
+    - cron: '0 0 * * *'    # Run batch 1 daily at 00:00 UTC
+    - cron: '0 6 * * *'    # Run batch 2 daily at 06:00 UTC
+    - cron: '0 12 * * *'   # Run batch 3 daily at 12:00 UTC
+    - cron: '0 18 * * *'   # Run batch 4 daily at 18:00 UTC
 
 jobs:
   split-tracks:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        batch: [batch_1, batch_2]  # 2 processes for each scheduled time
 
     steps:
       - name: Checkout code
@@ -42,4 +39,4 @@ jobs:
       - name: Run batch split script
         run: |          
           # Run the split_files.py script with batch argument
-          poetry run python split_tracks.py --batch ${{ matrix.batch }}
+          poetry run python split_tracks.py
