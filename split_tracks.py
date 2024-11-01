@@ -1,11 +1,9 @@
 from pathlib import Path
 from typing import List, Dict
 import io
-import argparse
 import logging
 import time
 
-import numpy as np
 from pydub import AudioSegment
 
 from googleapiclient.discovery import build
@@ -13,7 +11,6 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.errors import HttpError
 
 from src.utils import stem, Progress
 
