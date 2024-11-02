@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
     # split my tracks
     progress = Progress()
-    for track in tracks_to_do[:100]:
+    for track in tracks_to_do[:25]:
 
         # first create new empty splitted track folder
         splitted_folder_id = create_drive_folder(stem(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
