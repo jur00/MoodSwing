@@ -3,24 +3,31 @@ name: Split Tracks in Batches
 on:
   workflow_dispatch:  # Allow manual runs
   schedule:
-    - cron: '0 0 * * *'    # Run batch 1 daily at 00:00 UTC
-    - cron: '0 2 * * *'
-    - cron: '0 4 * * *'
-    - cron: '0 6 * * *'    # Run batch 2 daily at 06:00 UTC
-    - cron: '0 8 * * *'
-    - cron: '0 10 * * *'
-    - cron: '0 12 * * *'   # Run batch 3 daily at 12:00 UTC
-    - cron: '0 14 * * *'
-    - cron: '0 16 * * *'
-    - cron: '0 18 * * *'   # Run batch 4 daily at 18:00 UTC
-    - cron: '0 20 * * *'
-    - cron: '0 22 * * *'
+    - cron: '0 */2 * * *'
 
 jobs:
   split-tracks:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check if today is a run day
+        id: check_day
+        run: |
+          # Get the day of the year (1-365)
+          day_of_year=$(date +'%j')
+          # Calculate the remainder when divided by 4 (3 days on, 1 day off)
+          remainder=$(( day_of_year % 4 ))
+          if [ "$remainder" -lt 3 ]; then
+            echo "RUN_JOB=true" >> $GITHUB_ENV
+          else
+            echo "RUN_JOB=false" >> $GITHUB_ENV
+          fi
+          
+      - name: Run job only if it is a run day
+        if: env.RUN_JOB == 'true'
+        run: |
+          echo "Running scheduled task..."
+    
       - name: Checkout code
         uses: actions/checkout@v2
 
@@ -30,21 +37,25 @@ jobs:
           poetry-version: 1.8.4  # Specify Poetry version if necessary
 
       - name: Install dependencies
+        if: env.RUN_JOB == 'true'
         run: poetry install
 
       - name: Install FFmpeg
+        if: env.RUN_JOB == 'true'
         run: sudo apt-get install ffmpeg
 
       - name: Set up Google Drive credentials
         env:
           CLIENT_SECRETS: ${{ secrets.CLIENT_SECRETS_JSON }}
           GOOGLE_DRIVE_TOKEN: ${{ secrets.GOOGLE_DRIVE_TOKEN }}
+        if: env.RUN_JOB == 'true'
         run: |
           echo "$CLIENT_SECRETS" > client_secrets.json
           echo "$GOOGLE_DRIVE_TOKEN" > token.json
           # touch token.json
 
       - name: Run batch split script
+        if: env.RUN_JOB == 'true'
         run: |          
           # Run the split_files.py script with batch argument
           poetry run python split_tracks.py
