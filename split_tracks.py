@@ -64,10 +64,16 @@ if __name__ == "__main__":
     sheets_service = build('sheets', 'v4', credentials=credentials)
 
     # get list of all tracks
-    tracks_to_do = list_files_in_folder(folder_id_map["tracks_my"], drive_service)
+    tracks_to_do = list_files_in_folder(
+        folder_id=folder_id_map["tracks_my"],
+        drive_service=drive_service
+    )
 
     # check which tracks are already splitted
-    tracks_done = read_sheet(file_id_map["tracks_splitted"], sheets_service)
+    tracks_done = read_sheet(
+        sheet_id=file_id_map["tracks_splitted"],
+        sheets_service=sheets_service
+    )
 
     # filter my tracks, so only the unsplitted tracks are left
     tracks_to_do = filter_tracks_done_from_tracks_to_do(tracks_to_do, tracks_done)
@@ -81,19 +87,39 @@ if __name__ == "__main__":
     for track in tracks_to_do[:20]:
 
         # first create new empty splitted track folder
-        splitted_folder_id = create_drive_folder(normalize(track["name"]), folder_id_map["3sec_split_tracks"], drive_service)
+        splitted_folder_id = create_drive_folder(
+            folder_name=normalize(track["name"]),
+            parent_folder_id=folder_id_map["3sec_split_tracks"],
+            drive_service=drive_service
+        )
 
         # download track
-        download_one(track["id"], Path(f"track_temp/{track['name']}"), drive_service)
+        download_one(
+            drive_file_id=track["id"],
+            local_file_path=Path(f"track_temp/{track['name']}"),
+            drive_service=drive_service
+        )
 
         # split
-        split_audio_file(track["name"], Path("track_temp"), Path("splitted_temp"))
+        split_audio_file(
+            file_name=track["name"],
+            source_path=Path("track_temp"),
+            destination_path=Path("splitted_temp")
+        )
 
         # upload all resulting track segments
-        upload_many(splitted_folder_id, Path("splitted_temp"), drive_service)
+        upload_many(
+            drive_folder_id=splitted_folder_id,
+            local_folder_path=Path("splitted_temp"),
+            drive_service=drive_service
+        )
 
         # log the completed folder name to sheets logging
-        add_value_to_sheet(normalize(track["name"]), file_id_map["tracks_splitted"], sheets_service)
+        add_value_to_sheet(
+            value=normalize(track["name"]),
+            sheet_id=file_id_map["tracks_splitted"],
+            sheets_service=sheets_service
+        )
 
         # clean-up temporary local temporary files
         remove_temporary_files("track_temp")

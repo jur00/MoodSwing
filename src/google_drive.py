@@ -29,13 +29,13 @@ def list_files_in_folder(folder_id: str, drive_service):
 
     return items
 
-def list_folders_in_folder(folder_id: str, service):
+def list_folders_in_folder(folder_id: str, drive_service):
     items = []
     query = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder'"
     page_token = None
 
     while True:
-        results = service.files().list(
+        results = drive_service.files().list(
             q=query,
             fields="nextPageToken, files(name)",
             pageToken=page_token
@@ -55,14 +55,14 @@ def list_folders_in_folder(folder_id: str, service):
 
     return item_names
 
-def create_drive_folder(folder_name: str, parent_folder_id: str, service):
+def create_drive_folder(folder_name: str, parent_folder_id: str, drive_service):
     # Define metadata for the new folder
     folder_metadata = {
         'name': folder_name,
         'mimeType': 'application/vnd.google-apps.folder',
         'parents': [parent_folder_id] if parent_folder_id else []
     }
-    folder = service.files().create(body=folder_metadata, fields='id').execute()
+    folder = drive_service.files().create(body=folder_metadata, fields='id').execute()
     # print(f"Created Google Drive folder '{folder_name}' with ID: {folder.get('id')}")
     return folder.get('id')
 
@@ -83,7 +83,7 @@ def download_one(drive_file_id: str, local_file_path: Path, drive_service):
     with open(local_file_path, 'wb') as f:
         f.write(fh.getvalue())
 
-def upload_many(drive_folder_id: str, local_folder_path: Path, service):
+def upload_many(drive_folder_id: str, local_folder_path: Path, drive_service):
     # Iterate over files in the folder
     for file_path in local_folder_path.rglob('*'):
         # Skip directories and .gitkeep file
@@ -97,6 +97,6 @@ def upload_many(drive_folder_id: str, local_folder_path: Path, service):
         }
 
         media = MediaFileUpload(str(file_path), resumable=True)
-        service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
         time.sleep(.5)

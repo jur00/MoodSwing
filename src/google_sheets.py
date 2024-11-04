@@ -1,10 +1,10 @@
-def read_sheet(spreadsheet_id: str, sheets_service):
+def read_sheet(sheet_id: str, sheets_service):
     # Define the range to read from
     range_ = "Sheet1!A:A"  # Adjust this if your data is in a different sheet or column
 
     # Read the data from the sheet
     result = sheets_service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id,
+        spreadsheetId=sheet_id,
         range=range_
     ).execute()
 
@@ -16,7 +16,7 @@ def read_sheet(spreadsheet_id: str, sheets_service):
 
     return values
 
-def add_value_to_sheet(value: str, spreadsheet_id: str, sheets_service):
+def add_value_to_sheet(value: str, sheet_id: str, sheets_service):
     # Specify the range for appending data
     range_ = "Sheet1!A:A"  # Adjust the sheet name and range as needed
 
@@ -26,7 +26,7 @@ def add_value_to_sheet(value: str, spreadsheet_id: str, sheets_service):
 
     # Append the data to the sheet
     sheets_service.spreadsheets().values().append(
-        spreadsheetId=spreadsheet_id,
+        spreadsheetId=sheet_id,
         range=range_,
         valueInputOption="RAW",
         body=body
