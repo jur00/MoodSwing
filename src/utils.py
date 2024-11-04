@@ -6,7 +6,7 @@ import logging
 
 import numpy as np
 
-def stem(s: str) -> str:
+def normalize(s: str) -> str:
     '''
     string stemming. for example: 'Ciáran 123!' -> 'ciaran123'
     :param s: unstemmed string
