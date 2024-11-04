@@ -4,9 +4,17 @@ on:
   workflow_dispatch:  # Allow manual runs
   schedule:
     - cron: '0 0 * * *'    # Run batch 1 daily at 00:00 UTC
+    - cron: '0 2 * * *'
+    - cron: '0 4 * * *'
     - cron: '0 6 * * *'    # Run batch 2 daily at 06:00 UTC
+    - cron: '0 8 * * *'
+    - cron: '0 10 * * *'
     - cron: '0 12 * * *'   # Run batch 3 daily at 12:00 UTC
+    - cron: '0 14 * * *'
+    - cron: '0 16 * * *'
     - cron: '0 18 * * *'   # Run batch 4 daily at 18:00 UTC
+    - cron: '0 20 * * *'
+    - cron: '0 22 * * *'
 
 jobs:
   split-tracks:
