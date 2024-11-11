@@ -2,8 +2,8 @@ name: Split Tracks in Batches
 
 on:
   workflow_dispatch:  # Allow manual runs
-#  schedule:
-#    - cron: '0 */2 * * *'
+  schedule:
+    - cron: '0 */2 * * *'
 
 jobs:
   split-tracks:
