@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     # split my tracks
     progress = Progress()
-    for track in tracks_to_do[:20]:
+    for track in tracks_to_do[:15]:
 
         # first create new empty splitted track folder
         splitted_folder_id = create_drive_folder(
