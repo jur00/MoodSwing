@@ -12,3 +12,7 @@ creds = flow.run_local_server(port=0)
 
 with open(token_path, 'w') as token:
     token.write(creds.to_json())
+
+
+# after, open token.json, and copy the text into GOOGLE_DRIVE_TOKEN here:
+# https://github.com/jur00/MoodSwing/settings/secrets/actions
