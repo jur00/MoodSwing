@@ -5,6 +5,8 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+client_secrets_path = Path("client_secrets.json")
+scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
 def authenticate_with_oauth(client_secrets_path: Path, scopes: List):
     creds = None
@@ -17,14 +19,6 @@ def authenticate_with_oauth(client_secrets_path: Path, scopes: List):
 
     # If there are no valid credentials, we need to log in
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(client_secrets_path, scopes)
-            creds = flow.run_local_server(port=0)  # This will prompt for browser authentication
-
-        # Save the credentials for the next run
-        with open(token_path, 'w') as token:
-            token.write(creds.to_json())
+        raise ValueError('Refresh Google API token with refresh_google_token.py')
 
     return creds
