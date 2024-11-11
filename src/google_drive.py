@@ -1,6 +1,7 @@
 from pathlib import Path
 import io
 import time
+import ssl
 
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
@@ -97,6 +98,15 @@ def upload_many(drive_folder_id: str, local_folder_path: Path, drive_service):
         }
 
         media = MediaFileUpload(str(file_path), resumable=True)
-        drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+        try:
+            drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        except ssl.SSLEOFError as e:
+            try:
+                drive_service.files().delete(fileId=drive_folder_id).execute()
+                raise ValueError('API limits were exceeded, folder successfully deleted.')
+            except ssl.SSLEOFError as e:
+                raise ValueError('API limits were exceeded, but folder was not deleted.')
+
 
         time.sleep(.5)
