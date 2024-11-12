@@ -109,4 +109,4 @@ def upload_many(drive_folder_id: str, local_folder_path: Path, drive_service):
                 raise ValueError('API limits were exceeded, but folder was not deleted.')
 
 
-        time.sleep(.9)
+        time.sleep(1)
